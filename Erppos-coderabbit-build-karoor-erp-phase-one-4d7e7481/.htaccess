@@ -1,0 +1,40 @@
+<IfModule mod_passenger.c>
+    PassengerEnabled off
+</IfModule>
+
+Options -Indexes
+DirectoryIndex index.php
+AddDefaultCharset UTF-8
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Never expose internal PHP modules or private runtime data directly.
+    RewriteRule ^(?:config|src|views|storage)(?:/|$) - [F,L,NC]
+    RewriteRule ^uploads/.*\.(?:php[0-9]?|phtml|phar)$ - [F,L,NC]
+    RewriteRule (?:^|/)\.(?!well-known(?:/|$)) - [F,L]
+
+    # API modules are always dispatched through the authenticated front controller.
+    RewriteRule ^api/v1(?:/.*)?$ index.php [QSA,L,NC]
+
+    # Block direct execution of PHP files other than the front controller.
+    RewriteCond %{THE_REQUEST} \s/+[^?\ ]*\.php(?:[/?\s]) [NC]
+    RewriteCond %{REQUEST_URI} !/index\.php$ [NC]
+    RewriteRule ^ - [F,L]
+
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    RewriteRule ^ index.php [QSA,L]
+</IfModule>
+
+<FilesMatch "^(?:\.env(?:\..*)?|database\.sql|app\.js|composer\.(?:json|lock)|.*\.(?:log|bak|sql|ini))$">
+    Require all denied
+</FilesMatch>
+
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
