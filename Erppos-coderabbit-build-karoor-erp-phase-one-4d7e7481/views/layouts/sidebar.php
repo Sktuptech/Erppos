@@ -10,7 +10,7 @@ if (!isset($auth, $config) || !$auth instanceof Auth || !is_array($config)) {
 }
 
 $sidebarPath = Helpers::requestPath($config);
-$sidebarView = isset($_GET['view']) && is_string($_GET['view']) ? $_GET['view'] : '';
+$sidebarQuery = $_GET;
 
 $sidebarSections = [
     '' => [
@@ -39,8 +39,8 @@ $sidebarSections = [
     'Finance' => [
         ['label' => 'Chart of Accounts', 'icon' => 'fa-solid fa-sitemap', 'path' => '/finance', 'query' => 'view=chart-of-accounts', 'permission' => 'finance.view'],
         ['label' => 'Accounts', 'icon' => 'fa-solid fa-building-columns', 'path' => '/finance', 'query' => 'view=accounts', 'permission' => 'finance.view'],
-        ['label' => 'Transactions', 'icon' => 'fa-solid fa-arrow-trend-up', 'path' => '/finance', 'query' => 'view=transactions', 'permission' => 'finance.view'],
-        ['label' => 'General Ledger', 'icon' => 'fa-solid fa-book-open', 'path' => '/finance', 'query' => 'view=general-ledger', 'permission' => 'finance.view'],
+        ['label' => 'Transactions', 'icon' => 'fa-solid fa-arrow-trend-up', 'path' => '/finance', 'query' => 'view=journals', 'permission' => 'finance.view'],
+        ['label' => 'General Ledger', 'icon' => 'fa-solid fa-book-open', 'path' => '/finance', 'query' => 'view=ledger', 'permission' => 'finance.view'],
         ['label' => 'Income Statement', 'icon' => 'fa-solid fa-chart-line', 'path' => '/finance', 'query' => 'view=income-statement', 'permission' => 'finance.reports'],
         ['label' => 'Balance Sheet', 'icon' => 'fa-solid fa-scale-balanced', 'path' => '/finance', 'query' => 'view=balance-sheet', 'permission' => 'finance.reports'],
         ['label' => 'Cash Flow', 'icon' => 'fa-solid fa-water', 'path' => '/finance', 'query' => 'view=cash-flow', 'permission' => 'finance.reports'],
@@ -53,15 +53,15 @@ $sidebarSections = [
         ['label' => 'Attendance', 'icon' => 'fa-solid fa-user-clock', 'path' => '/hrm', 'query' => 'view=attendance', 'permission' => 'hr.attendance'],
         ['label' => 'Leave', 'icon' => 'fa-solid fa-calendar-day', 'path' => '/hrm', 'query' => 'view=leave', 'permission' => 'hr.leave'],
         ['label' => 'Payroll', 'icon' => 'fa-solid fa-money-check-dollar', 'path' => '/hrm', 'query' => 'view=payroll', 'permission' => 'hr.payroll'],
-        ['label' => 'Salary Slips', 'icon' => 'fa-solid fa-file-lines', 'path' => '/hrm', 'query' => 'view=salary-slips', 'permission' => 'hr.payroll'],
+        ['label' => 'Salary Slips', 'icon' => 'fa-solid fa-file-lines', 'path' => '/hrm', 'query' => 'view=payroll', 'permission' => 'hr.payroll'],
     ],
     'Reports' => [
-        ['label' => 'Sales Reports', 'icon' => 'fa-solid fa-chart-column', 'path' => '/reports', 'query' => 'view=sales', 'permission' => 'reports.view'],
-        ['label' => 'Purchase Reports', 'icon' => 'fa-solid fa-chart-area', 'path' => '/reports', 'query' => 'view=purchases', 'permission' => 'reports.view'],
-        ['label' => 'Inventory Reports', 'icon' => 'fa-solid fa-chart-simple', 'path' => '/reports', 'query' => 'view=inventory', 'permission' => 'reports.view'],
-        ['label' => 'Financial Reports', 'icon' => 'fa-solid fa-chart-pie', 'path' => '/reports', 'query' => 'view=finance', 'permission' => 'finance.reports'],
-        ['label' => 'HR Reports', 'icon' => 'fa-solid fa-chart-gantt', 'path' => '/reports', 'query' => 'view=hr', 'permission' => 'hr.view'],
-        ['label' => 'Profit Reports', 'icon' => 'fa-solid fa-coins', 'path' => '/reports', 'query' => 'view=profit', 'permission' => 'reports.view'],
+        ['label' => 'Sales Reports', 'icon' => 'fa-solid fa-chart-column', 'path' => '/reports', 'query' => 'report=sales&view=daily', 'permission' => 'reports.view'],
+        ['label' => 'Purchase Reports', 'icon' => 'fa-solid fa-chart-area', 'path' => '/reports', 'query' => 'report=purchases&view=daily', 'permission' => 'reports.view'],
+        ['label' => 'Inventory Reports', 'icon' => 'fa-solid fa-chart-simple', 'path' => '/reports', 'query' => 'report=inventory&view=valuation', 'permission' => 'reports.view'],
+        ['label' => 'Financial Reports', 'icon' => 'fa-solid fa-chart-pie', 'path' => '/reports', 'query' => 'report=finance&view=general-ledger', 'permission' => 'finance.reports'],
+        ['label' => 'HR Reports', 'icon' => 'fa-solid fa-chart-gantt', 'path' => '/reports', 'query' => 'report=hr&view=employees', 'permission' => 'hr.view'],
+        ['label' => 'Profit Reports', 'icon' => 'fa-solid fa-coins', 'path' => '/reports', 'query' => 'report=profit&view=daily', 'permission' => 'reports.view'],
     ],
     'System' => [
         ['label' => 'Users', 'icon' => 'fa-solid fa-user-gear', 'path' => '/settings', 'query' => 'view=users', 'permission' => 'users.manage'],
@@ -88,7 +88,7 @@ if (!function_exists('karoor_render_sidebar_navigation')) {
         Auth $auth,
         array $config,
         string $currentPath,
-        string $currentView
+        array $currentQuery
     ): void {
         foreach ($sections as $section => $items) {
             $visibleItems = array_values(array_filter(
@@ -103,13 +103,20 @@ if (!function_exists('karoor_render_sidebar_navigation')) {
             }
             echo '<ul class="sidebar-nav-list">';
             foreach ($visibleItems as $item) {
-                $itemView = '';
+                $queryValues = [];
                 if (isset($item['query'])) {
                     parse_str((string) $item['query'], $queryValues);
-                    $itemView = is_string($queryValues['view'] ?? null) ? $queryValues['view'] : '';
                 }
-                $isActive = $currentPath === $item['path']
-                    && ($itemView === '' || $currentView === $itemView);
+                $isActive = $currentPath === $item['path'];
+                if ($queryValues === [] && $currentQuery !== []) {
+                    $isActive = false;
+                }
+                foreach ($queryValues as $key => $value) {
+                    $currentValue = $currentQuery[$key] ?? null;
+                    $isActive = $isActive
+                        && is_scalar($currentValue)
+                        && (string) $currentValue === (string) $value;
+                }
                 $url = Helpers::appPath($config, (string) $item['path']);
                 if (isset($item['query'])) {
                     $url .= '?' . $item['query'];
@@ -132,7 +139,7 @@ if (!function_exists('karoor_render_sidebar_navigation')) {
         <span class="brand-copy"><strong>Karoor</strong><small>Enterprise ERP</small></span>
     </a>
     <nav class="sidebar-scroll">
-        <?php karoor_render_sidebar_navigation($sidebarSections, $auth, $config, $sidebarPath, $sidebarView); ?>
+        <?php karoor_render_sidebar_navigation($sidebarSections, $auth, $config, $sidebarPath, $sidebarQuery); ?>
     </nav>
     <div class="sidebar-footer-card">
         <span class="sidebar-footer-icon"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i></span>
@@ -150,7 +157,7 @@ if (!function_exists('karoor_render_sidebar_navigation')) {
     </div>
     <div class="offcanvas-body sidebar-scroll">
         <nav aria-label="Mobile navigation">
-            <?php karoor_render_sidebar_navigation($sidebarSections, $auth, $config, $sidebarPath, $sidebarView); ?>
+            <?php karoor_render_sidebar_navigation($sidebarSections, $auth, $config, $sidebarPath, $sidebarQuery); ?>
         </nav>
     </div>
 </div>

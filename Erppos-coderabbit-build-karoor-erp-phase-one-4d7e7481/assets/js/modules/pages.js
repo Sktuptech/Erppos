@@ -509,6 +509,71 @@ function initSettings({ api, notify, confirmAction, tables }) {
     bind('companySettingsForm', 'company', (form) => Object.fromEntries(new FormData(form).entries()));
     bind('applicationSettingsForm', 'settings', (form) => Object.fromEntries(new FormData(form).entries()));
     bind('numberingSettingsForm', 'sequences', (form) => [...form.querySelectorAll('[data-sequence-row]')].map((row) => ({ id: row.dataset.id, prefix: row.querySelector('[name="prefix"]').value, padding: row.querySelector('[name="padding"]').value, reset_period: row.querySelector('[name="reset_period"]').value })));
+    const userTable = document.getElementById('userTable');
+    const userForm = document.getElementById('userCreateForm');
+    userForm?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        if (!userForm.reportValidity()) return;
+        const data = Object.fromEntries(new FormData(userForm).entries());
+        data.role_ids = [...userForm.querySelectorAll('[name="role_ids"]:checked')].map((input) => input.value);
+        if (data.role_ids.length === 0) {
+            notify('Select at least one role.', 'warning');
+            return;
+        }
+        const submit = userForm.querySelector('[type="submit"]');
+        submit.disabled = true;
+        try {
+            await api.post('system/users', data);
+            notify('User created.', 'success');
+            userForm.reset();
+            window.bootstrap.Modal.getInstance(document.getElementById('userCreateModal'))?.hide();
+            tableController(tables, userTable)?.load();
+        } catch (error) {
+            notify(error.message || 'Unable to create the user.', 'danger');
+        } finally {
+            submit.disabled = false;
+        }
+    });
+    userTable?.addEventListener('karoor:table-cell', (event) => {
+        if (event.detail.column.format !== 'actions') return;
+        event.preventDefault();
+        const { record, cell } = event.detail;
+        if (Number(record.id) === Number(userTable.dataset.currentUser)) {
+            cell.textContent = 'Current user';
+            return;
+        }
+        cell.append(makeButton('Archive', 'danger', async () => {
+            if (!await confirmAction(`Archive ${record.full_name}?`, { danger: true, confirmLabel: 'Archive user' })) return;
+            try {
+                await api.delete(`system/users/${record.id}`);
+                notify('User archived.', 'success');
+                tableController(tables, userTable)?.load();
+            } catch (error) {
+                notify(error.message || 'Unable to archive the user.', 'danger');
+            }
+        }));
+    });
+    const roleTable = document.getElementById('roleTable');
+    const roleForm = document.getElementById('roleCreateForm');
+    roleForm?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        if (!roleForm.reportValidity()) return;
+        const data = Object.fromEntries(new FormData(roleForm).entries());
+        data.permission_ids = [...roleForm.querySelectorAll('[name="permission_ids"]:checked')].map((input) => input.value);
+        const submit = roleForm.querySelector('[type="submit"]');
+        submit.disabled = true;
+        try {
+            await api.post('system/roles', data);
+            notify('Role created.', 'success');
+            roleForm.reset();
+            window.bootstrap.Modal.getInstance(document.getElementById('roleCreateModal'))?.hide();
+            tableController(tables, roleTable)?.load();
+        } catch (error) {
+            notify(error.message || 'Unable to create the role.', 'danger');
+        } finally {
+            submit.disabled = false;
+        }
+    });
     const backupTable = document.getElementById('backupTable');
     document.querySelector('[data-backup-create]')?.addEventListener('click', async (event) => {
         event.currentTarget.disabled = true; try { await api.post('system/backups', {}); notify('Backup created.', 'success'); tableController(tables, backupTable)?.load(); } catch (error) { notify(error.message, 'danger'); } finally { event.currentTarget.disabled = false; }

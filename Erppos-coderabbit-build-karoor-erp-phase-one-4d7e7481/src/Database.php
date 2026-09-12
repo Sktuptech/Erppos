@@ -78,7 +78,17 @@ final class Database
     public function statement(string $sql, array $parameters = []): PDOStatement
     {
         $statement = $this->connection()->prepare($sql);
-        $statement->execute($parameters);
+        foreach ($parameters as $key => $value) {
+            $placeholder = is_int($key) ? $key + 1 : (str_starts_with($key, ':') ? $key : ':' . $key);
+            $type = match (true) {
+                is_bool($value) => PDO::PARAM_BOOL,
+                is_int($value) => PDO::PARAM_INT,
+                $value === null => PDO::PARAM_NULL,
+                default => PDO::PARAM_STR,
+            };
+            $statement->bindValue($placeholder, $value, $type);
+        }
+        $statement->execute();
 
         return $statement;
     }
